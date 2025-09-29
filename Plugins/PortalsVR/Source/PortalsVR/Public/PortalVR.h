@@ -4,14 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include <Components/SceneCaptureComponent2D.h>
 #include "PortalVR.generated.h"
 
 UCLASS()
+
+
 class PORTALSVR_API APortalVR : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// Sets default values for this actor's properties
 	APortalVR();
 
@@ -26,6 +29,8 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	void OnXRLateUpdate();	
+
 	void ConnectToPortal(APortalVR* otherPortal);
 
 	//Mesh
@@ -34,12 +39,35 @@ public:
 
 	//RenderTarget
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UTextureRenderTarget2D* PortalRenderTarget;
+	UTextureRenderTarget2D* PortalRenderTargetLeft;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName RenderTargetParameterName = TEXT("RenderTargetPortal");
+	UTextureRenderTarget2D* PortalRenderTargetRight;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName RenderTargetParameterNameLeft = TEXT("RenderTargetPortalLeft");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName RenderTargetParameterNameRight = TEXT("RenderTargetPortalRight");
 
 	// Linking objects
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	APortalVR* OtherPortal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USceneCaptureComponent2D* SceneCaptureComponent2DLeft;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USceneCaptureComponent2D* SceneCaptureComponent2DRight;
+
+	//DEBUG
+
+	//Mesh
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMeshComponent* eyeLeftDebug;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMeshComponent* eyeRightDebug;
+
 };

@@ -108,7 +108,7 @@ void APortalVR::Tick(float DeltaTime)
         FQuat CamRotation = CameraTransform.GetRotation();
 
 
-        //GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotation, CamLocation);
+        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotation, CamLocation);
 
         FQuat offsetRotator = FQuat::Identity;
         FVector offsetLocation = FVector(0,0,0);
