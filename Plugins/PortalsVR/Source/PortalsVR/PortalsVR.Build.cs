@@ -38,6 +38,10 @@ public class PortalsVR : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
+                "Renderer",
+				"RenderCore",
+				"RHI"
+
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
