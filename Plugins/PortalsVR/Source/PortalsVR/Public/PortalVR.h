@@ -7,6 +7,8 @@
 #include <Components/SceneCaptureComponent2D.h>
 #include "PortalVR.generated.h"
 
+#define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 1
+
 UCLASS()
 
 
@@ -61,13 +63,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USceneCaptureComponent2D* SceneCaptureComponent2DRight;
 
-	//DEBUG
+	bool leftImageRendered = false;
+	bool rightImageRendered = false;
 
-	//Mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UStaticMeshComponent* eyeLeftDebug;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UStaticMeshComponent* eyeRightDebug;
 
 };

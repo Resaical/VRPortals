@@ -7,6 +7,8 @@
 #include "PortalVR.h"
 #include "PortalSubsystem.generated.h"
 
+#define PORTAL_SUBSYSTEM_STEREOSCOPIC_IN_CHARGE 0
+
 UCLASS()
 class UPortalSubsystem : public UTickableWorldSubsystem
 {
@@ -17,12 +19,12 @@ public:
     {
         Super::Initialize(Collection);
 
-        //ViewExtension = FSceneViewExtensions::NewExtension<FPortalViewExtension>();
+        ViewExtension = FSceneViewExtensions::NewExtension<FPortalViewExtension>();
     }
 
     virtual void Deinitialize() override
     {
-        //ViewExtension.Reset();
+        ViewExtension.Reset();
 
         Super::Deinitialize();
     }
@@ -32,17 +34,16 @@ public:
         RETURN_QUICK_DECLARE_CYCLE_STAT(UPortalSubsystem, STATGROUP_Tickables);
     }
 
-    virtual void Tick(float DeltaTime) override
-    {
-        Super::Tick(DeltaTime);
+    virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
-        leftRendered = false;
-        rightRendered = false;
-    }
+    virtual void Tick(float DeltaTime) override;
 
     TSharedPtr<FPortalViewExtension, ESPMode::ThreadSafe> ViewExtension;
     TArray<TWeakObjectPtr<APortalVR>> ActivePortals;
 
     bool leftRendered = false;
     bool rightRendered = false;
+
+    FTransform lateUpdatedLeftEyeWorldTransform = FTransform::Identity;
+    FTransform lateUpdatedRightEyeWorldTransform = FTransform::Identity;
 };

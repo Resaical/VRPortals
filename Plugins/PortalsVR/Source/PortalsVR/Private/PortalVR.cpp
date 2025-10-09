@@ -22,29 +22,21 @@ APortalVR::APortalVR()
     PortalMesh->SetupAttachment(RootComponent);
     PortalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    eyeLeftDebug = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Eye left debug"));
-    eyeLeftDebug->SetupAttachment(RootComponent);
-    eyeLeftDebug->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    eyeRightDebug = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Eye right debug"));
-    eyeRightDebug->SetupAttachment(RootComponent);
-    eyeRightDebug->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-
     //SceneCapture2D
     {
         SceneCaptureComponent2DLeft = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Left"));
         SceneCaptureComponent2DLeft->SetupAttachment(RootComponent);
         SceneCaptureComponent2DLeft->bUseCustomProjectionMatrix = true;
-        SceneCaptureComponent2DLeft->bCaptureEveryFrame = false;
+        SceneCaptureComponent2DLeft->bCaptureEveryFrame = true;
         SceneCaptureComponent2DLeft->SetTickGroup(TG_PostPhysics);
+        SceneCaptureComponent2DLeft->HideComponent(PortalMesh);
 
         SceneCaptureComponent2DRight = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Right"));
         SceneCaptureComponent2DRight->SetupAttachment(RootComponent);
         SceneCaptureComponent2DRight->bUseCustomProjectionMatrix = true;
-        SceneCaptureComponent2DRight->bCaptureEveryFrame = false;
+        SceneCaptureComponent2DRight->bCaptureEveryFrame = true;
         SceneCaptureComponent2DRight->SetTickGroup(TG_PostPhysics);
-
+        SceneCaptureComponent2DRight->HideComponent(PortalMesh);
     }
 
     //Render Target
@@ -61,6 +53,7 @@ APortalVR::APortalVR()
 
     }
 }
+int count = 0;
 
 // Called when the game starts or when spawned
 void APortalVR::BeginPlay()
@@ -74,19 +67,45 @@ void APortalVR::BeginPlay()
         PortalRenderTargetRight->ResizeTarget(RenderTargetSize.X, RenderTargetSize.Y);
     }
 
-
     UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(PortalMesh->GetMaterial(0), this);
     PortalMesh->SetMaterial(0, DynMat);
     DynMat->SetTextureParameterValue(RenderTargetParameterNameLeft, PortalRenderTargetLeft);
     DynMat->SetTextureParameterValue(RenderTargetParameterNameRight, PortalRenderTargetRight);
 
     GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
+    count = 0;   
 }
+
 
 // Called every frame
 void APortalVR::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    leftImageRendered = false;
+    rightImageRendered = false;
+
+    if (count == 5)
+    {
+        if (GEngine && GEngine->XRSystem.IsValid())
+        {
+            IStereoRendering* StereoDevice = GEngine->XRSystem->GetStereoRenderingDevice().Get();
+            if (StereoDevice)
+            {
+                SceneCaptureComponent2DLeft->CustomProjectionMatrix = StereoDevice->GetStereoProjectionMatrix(eSSE_LEFT_EYE);
+                SceneCaptureComponent2DRight->CustomProjectionMatrix = StereoDevice->GetStereoProjectionMatrix(eSSE_RIGHT_EYE);
+            }
+        }
+        count++;
+    }
+    else if( count < 5)
+    {
+        count++;
+    }
+
+
+
+#if PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 
 
     for (int eyeIndex = eSSE_LEFT_EYE; eyeIndex <= eSSE_RIGHT_EYE; eyeIndex++)
     {
@@ -97,18 +116,16 @@ void APortalVR::Tick(float DeltaTime)
 
 
         auto PlayerController = GetWorld()->GetFirstPlayerController();
-        auto CamManager = PlayerController->PlayerCameraManager;
-        const auto CameraTransform = CamManager->GetTransform();
+        auto PlayerPawn = PlayerController->GetPawn();
 
         int32 HMDDeviceId = IXRTrackingSystem::HMDDeviceId;
 
-        //FVector CamLocation = FVector::Zero();
-        //FQuat CamRotation = FQuat::Identity;
-        FVector CamLocation = CameraTransform.GetLocation();
-        FQuat CamRotation = CameraTransform.GetRotation();
+        FVector CamLocationLocal = FVector::Zero();
+        FQuat CamRotationLocal = FQuat::Identity;
 
-
-        //GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotation, CamLocation);
+        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
+        auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
+        auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
 
         FQuat offsetRotator = FQuat::Identity;
         FVector offsetLocation = FVector(0,0,0);
@@ -119,22 +136,10 @@ void APortalVR::Tick(float DeltaTime)
         FTransform EyeTransform(CamRotation, EyeLocation);
         FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
 
-        //DEBUG
-        auto targetDebugEye = (eyeIndex == eSSE_LEFT_EYE) ? eyeLeftDebug : eyeRightDebug;
-        targetDebugEye->SetWorldLocation(EyeLocation + FVector(15, 0, 0));
-
-
         if (eyeIndex == eSSE_LEFT_EYE) 
         {
             UE_LOG(LogTemp, Log, TEXT("Cam Location HMD : %s\n"), *CamLocation.ToString());
-            UE_LOG(LogTemp, Log, TEXT("PlayerManagerCameraPos : %s \n"), *CameraTransform.GetLocation().ToString());
         }
-        else
-        {
-
-        }
-
-        //
 
         auto portalWorldToLocal = GetTransform().ToMatrixWithScale().Inverse();
         FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
@@ -147,7 +152,16 @@ void APortalVR::Tick(float DeltaTime)
 
         sceneCapture->CustomProjectionMatrix = proj;
         sceneCapture->SetWorldLocationAndRotation(otherPortalCameraNewLocation, otherPortalCameraNewRotation);
+
+    #if PORTAL_REVERT_LATE_XRHMD_UPDATE
+
+        if(eyeIndex == eSSE_LEFT_EYE) GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedLeftEyeWorldTransform = EyeTransform;
+        else GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedRightEyeWorldTransform = EyeTransform;
+
+    #endif
     }
+
+#endif
 }
 
 void APortalVR::OnXRLateUpdate()
