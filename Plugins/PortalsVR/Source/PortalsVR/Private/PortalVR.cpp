@@ -52,6 +52,26 @@ APortalVR::APortalVR()
         PortalRenderTargetRight->UpdateResourceImmediate(true);
 
     }
+
+    //BoxTrigger
+    {
+        PortalBoxTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("Portal BoxTrigger"));
+        PortalBoxTrigger->SetupAttachment(RootComponent);
+
+        FScriptDelegate OnBeginDelegate;
+        OnBeginDelegate.BindUFunction(this, TEXT("OnPortalOverlapBegin"));
+        PortalBoxTrigger->OnComponentBeginOverlap.Add(OnBeginDelegate);
+
+        FScriptDelegate OnEndDelegate;
+        OnEndDelegate.BindUFunction(this, TEXT("OnPortalOverlapEnd"));
+        PortalBoxTrigger->OnComponentEndOverlap.Add(OnEndDelegate);
+
+        PortalBoxTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        PortalBoxTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+        PortalBoxTrigger->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+        PortalBoxTrigger->SetGenerateOverlapEvents(true);
+    }
+
 }
 int count = 0;
 
@@ -103,6 +123,26 @@ void APortalVR::Tick(float DeltaTime)
         count++;
     }
 
+    for (auto Actor : ActorsToCheckTeleport)
+    {
+        auto PlayerController = GetWorld()->GetFirstPlayerController();
+        auto PlayerPawn = PlayerController->GetPawn();
+
+        bool IsVRPlayer = false;
+        if (Actor == PlayerPawn) IsVRPlayer = true;
+
+        FVector LocationCheckTeleport = IsVRPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
+        FVector PortalForward = this->GetActorForwardVector();
+        FVector PortalToActor = (LocationCheckTeleport - this->GetActorLocation()).GetSafeNormal();
+
+        auto dot = FVector::DotProduct(PortalForward, PortalToActor);
+
+        UE_LOG(LogTemp, Warning, TEXT("Portal Forward = %s"), *PortalForward.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("Actor To Portal = %s"), *PortalToActor.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("Dot = %f"), dot);
+
+        if (dot >= 0) Teleport(Actor);
+    }
 
 
 #if PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 
@@ -189,5 +229,38 @@ void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
         ConnectToPortal(OtherPortal);
     }
 }
+
+void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (!ActorsToCheckTeleport.Contains(OtherActor))
+    {
+        ActorsToCheckTeleport.Add(OtherActor);
+    }
+}
+
+void APortalVR::OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+    ActorsToCheckTeleport.Remove(OtherActor);
+}
+
+void APortalVR::Teleport(AActor* Actor)
+{
+    if (!OtherPortal || !Actor) return;
+
+    auto ActorWorldMatrix = Actor->ActorToWorld().ToMatrixWithScale();
+    auto portalWorldToLocalMatrix = GetTransform().ToMatrixWithScale().Inverse();
+    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
+    auto otherPortalWorldMatrix = OtherPortal->GetTransform().ToMatrixWithScale();
+
+    auto portalTransformMatrix = ActorWorldMatrix * portalWorldToLocalMatrix * RotMatrix * otherPortalWorldMatrix;
+
+    auto otherPortalActorNewLocation = portalTransformMatrix.GetOrigin();
+    auto otherPortalActorNewRotation = portalTransformMatrix.Rotator();
+
+    Actor->SetActorLocation(otherPortalActorNewLocation);
+    Actor->SetActorRotation(otherPortalActorNewRotation);
+}
+
+
 
 
