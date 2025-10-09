@@ -5,15 +5,16 @@
 #include <Engine/TextureRenderTarget2D.h>
 #include "GameFramework/GameUserSettings.h"
 #include <Camera/CameraComponent.h>
-
-
+#include "IXRTrackingSystem.h"
+#include "IHeadMountedDisplay.h"
+#include "IXRCamera.h"
 
 /// Sets default values
 APortalVR::APortalVR()
 {
     // Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
     PrimaryActorTick.bCanEverTick = true;
-    PrimaryActorTick.TickGroup = TG_PostUpdateWork;
+    PrimaryActorTick.TickGroup = TG_PrePhysics;
 
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Scene Root"));
 
@@ -21,65 +22,162 @@ APortalVR::APortalVR()
     PortalMesh->SetupAttachment(RootComponent);
     PortalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    PortalRenderTarget = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target"));
-    PortalRenderTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
-    PortalRenderTarget->InitAutoFormat(1024, 1024);
-    PortalRenderTarget->UpdateResourceImmediate(true);
+    //SceneCapture2D
+    {
+        SceneCaptureComponent2DLeft = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Left"));
+        SceneCaptureComponent2DLeft->SetupAttachment(RootComponent);
+        SceneCaptureComponent2DLeft->bUseCustomProjectionMatrix = true;
+        SceneCaptureComponent2DLeft->bCaptureEveryFrame = true;
+        SceneCaptureComponent2DLeft->SetTickGroup(TG_PostPhysics);
+        SceneCaptureComponent2DLeft->HideComponent(PortalMesh);
+
+        SceneCaptureComponent2DRight = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Right"));
+        SceneCaptureComponent2DRight->SetupAttachment(RootComponent);
+        SceneCaptureComponent2DRight->bUseCustomProjectionMatrix = true;
+        SceneCaptureComponent2DRight->bCaptureEveryFrame = true;
+        SceneCaptureComponent2DRight->SetTickGroup(TG_PostPhysics);
+        SceneCaptureComponent2DRight->HideComponent(PortalMesh);
+    }
+
+    //Render Target
+    {
+        PortalRenderTargetLeft = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Left"));
+        PortalRenderTargetLeft->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
+        PortalRenderTargetLeft->InitAutoFormat(1024, 1024);
+        PortalRenderTargetLeft->UpdateResourceImmediate(true);
+
+        PortalRenderTargetRight = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Right"));
+        PortalRenderTargetRight->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
+        PortalRenderTargetRight->InitAutoFormat(1024, 1024);
+        PortalRenderTargetRight->UpdateResourceImmediate(true);
+
+    }
 }
+int count = 0;
 
 // Called when the game starts or when spawned
 void APortalVR::BeginPlay()
 {
     Super::BeginPlay();
 
-    FVector2D viewportSize = FVector2D(0, 0);
-    if (GEngine && GEngine->GameViewport)
+    if (GEngine && GEngine->XRSystem)
     {
-        viewportSize = GEngine->GameUserSettings->GetScreenResolution();
+        const auto RenderTargetSize = GEngine->XRSystem->GetHMDDevice()->GetIdealRenderTargetSize();
+        PortalRenderTargetLeft->ResizeTarget(RenderTargetSize.X, RenderTargetSize.Y);
+        PortalRenderTargetRight->ResizeTarget(RenderTargetSize.X, RenderTargetSize.Y);
     }
-    PortalRenderTarget->ResizeTarget(viewportSize.X, viewportSize.Y);
 
     UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(PortalMesh->GetMaterial(0), this);
     PortalMesh->SetMaterial(0, DynMat);
-    DynMat->SetTextureParameterValue(RenderTargetParameterName, PortalRenderTarget);
+    DynMat->SetTextureParameterValue(RenderTargetParameterNameLeft, PortalRenderTargetLeft);
+    DynMat->SetTextureParameterValue(RenderTargetParameterNameRight, PortalRenderTargetRight);
 
     GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
+    count = 0;   
 }
+
 
 // Called every frame
 void APortalVR::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    //Matrix multiplication to syncronize portal camera
+    leftImageRendered = false;
+    rightImageRendered = false;
+
+    if (count == 5)
     {
-        if (OtherPortal)
+        if (GEngine && GEngine->XRSystem.IsValid())
         {
-            //APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
-            //APawn* PlayerPawn = PlayerController->GetPawn();
-            //UCameraComponent* CameraComponent = PlayerPawn->FindComponentByClass<UCameraComponent>();
-            //FTransform CameraTransform = CameraComponent->GetComponentTransform();
+            IStereoRendering* StereoDevice = GEngine->XRSystem->GetStereoRenderingDevice().Get();
+            if (StereoDevice)
+            {
+                SceneCaptureComponent2DLeft->CustomProjectionMatrix = StereoDevice->GetStereoProjectionMatrix(eSSE_LEFT_EYE);
+                SceneCaptureComponent2DRight->CustomProjectionMatrix = StereoDevice->GetStereoProjectionMatrix(eSSE_RIGHT_EYE);
+            }
+        }
+        count++;
+    }
+    else if( count < 5)
+    {
+        count++;
+    }
 
-            //auto playerCameraWorld = CameraTransform.ToMatrixWithScale();
-            //auto portalWorldToLocal = GetTransform().ToMatrixWithScale().Inverse();
-            //FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-            //auto otherPortalWorld = OtherPortal->GetTransform().ToMatrixWithScale();
 
-            //auto portalTransformMatrix = playerCameraWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
 
-            //auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
-            //auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
+#if PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 
 
-            //UE_LOG(LogTemp, Warning, TEXT("Other portal camera pos = %s"), *otherPortalCameraNewLocation.ToString());
+    for (int eyeIndex = eSSE_LEFT_EYE; eyeIndex <= eSSE_RIGHT_EYE; eyeIndex++)
+    {
+        auto Target = (eyeIndex == eSSE_LEFT_EYE) ? PortalRenderTargetLeft : PortalRenderTargetRight;
+        auto sceneCapture = (eyeIndex == eSSE_LEFT_EYE) ? OtherPortal->SceneCaptureComponent2DLeft : OtherPortal->SceneCaptureComponent2DRight;
 
+        auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(eyeIndex);
+
+
+        auto PlayerController = GetWorld()->GetFirstPlayerController();
+        auto PlayerPawn = PlayerController->GetPawn();
+
+        int32 HMDDeviceId = IXRTrackingSystem::HMDDeviceId;
+
+        FVector CamLocationLocal = FVector::Zero();
+        FQuat CamRotationLocal = FQuat::Identity;
+
+        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
+        auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
+        auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
+
+        FQuat offsetRotator = FQuat::Identity;
+        FVector offsetLocation = FVector(0,0,0);
+
+        GEngine->XRSystem->GetRelativeEyePose(HMDDeviceId, eyeIndex, offsetRotator, offsetLocation);  
+
+        FVector EyeLocation = CamRotation.RotateVector(offsetLocation) + CamLocation;
+        FTransform EyeTransform(CamRotation, EyeLocation);
+        FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
+
+        if (eyeIndex == eSSE_LEFT_EYE) 
+        {
+            UE_LOG(LogTemp, Log, TEXT("Cam Location HMD : %s\n"), *CamLocation.ToString());
         }
 
+        auto portalWorldToLocal = GetTransform().ToMatrixWithScale().Inverse();
+        FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
+        auto otherPortalWorld = OtherPortal->GetTransform().ToMatrixWithScale();
+
+        auto portalTransformMatrix = EyeWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
+
+        auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
+        auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
+
+        sceneCapture->CustomProjectionMatrix = proj;
+        sceneCapture->SetWorldLocationAndRotation(otherPortalCameraNewLocation, otherPortalCameraNewRotation);
+
+    #if PORTAL_REVERT_LATE_XRHMD_UPDATE
+
+        if(eyeIndex == eSSE_LEFT_EYE) GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedLeftEyeWorldTransform = EyeTransform;
+        else GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedRightEyeWorldTransform = EyeTransform;
+
+    #endif
     }
+
+#endif
+}
+
+void APortalVR::OnXRLateUpdate()
+{
+
 }
 
 void APortalVR::ConnectToPortal(APortalVR* otherPortal)
 {
     OtherPortal = otherPortal;
+    otherPortal->SceneCaptureComponent2DLeft->TextureTarget = PortalRenderTargetLeft;
+    otherPortal->SceneCaptureComponent2DRight->TextureTarget = PortalRenderTargetRight;
+
+    OtherPortal->SceneCaptureComponent2DLeft->HiddenActors.Add(this);
+    OtherPortal->SceneCaptureComponent2DRight->HiddenActors.Add(this);
+
 }
 
 void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
@@ -91,4 +189,5 @@ void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
         ConnectToPortal(OtherPortal);
     }
 }
+
 
