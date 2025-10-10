@@ -53,6 +53,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UStaticMeshComponent* PortalMesh;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMeshComponent* PortalHollowCubeMesh;
+
 	//RenderTarget
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UTextureRenderTarget2D* PortalRenderTargetLeft;
