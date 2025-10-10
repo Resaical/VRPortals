@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include <Components/SceneCaptureComponent2D.h>
+#include <Components/BoxComponent.h>
 #include "PortalVR.generated.h"
 
 #define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 1
@@ -35,9 +36,25 @@ public:
 
 	void ConnectToPortal(APortalVR* otherPortal);
 
+	//Teleport
+	UFUNCTION()
+	void OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+		bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UFUNCTION(CallInEditor, Category = "Portal", DisplayName = "Teleport")
+	void Teleport(AActor* Actor);
+
 	//Mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UStaticMeshComponent* PortalMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMeshComponent* PortalHollowCubeMesh;
 
 	//RenderTarget
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -66,9 +83,11 @@ public:
 	bool leftImageRendered = false;
 	bool rightImageRendered = false;
 
+	//Teleport
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UStaticMeshComponent* eyeLeftDebug;
+	UBoxComponent* PortalBoxTrigger;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<AActor*> ActorsToCheckTeleport;
 
 };

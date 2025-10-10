@@ -18,9 +18,16 @@ APortalVR::APortalVR()
 
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Scene Root"));
 
-    PortalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Portal Mesh"));
-    PortalMesh->SetupAttachment(RootComponent);
-    PortalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    //Mesh
+    {
+        PortalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Portal Mesh"));
+        PortalMesh->SetupAttachment(RootComponent);
+        PortalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        PortalHollowCubeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Portal Hollow Cube Mesh"));
+        PortalHollowCubeMesh->SetupAttachment(RootComponent);
+        PortalHollowCubeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
 
     //SceneCapture2D
     {
@@ -30,6 +37,8 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DLeft->bCaptureEveryFrame = true;
         SceneCaptureComponent2DLeft->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DLeft->HideComponent(PortalMesh);
+        SceneCaptureComponent2DLeft->HideComponent(PortalHollowCubeMesh);
+
 
         SceneCaptureComponent2DRight = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Right"));
         SceneCaptureComponent2DRight->SetupAttachment(RootComponent);
@@ -37,6 +46,8 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DRight->bCaptureEveryFrame = true;
         SceneCaptureComponent2DRight->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DRight->HideComponent(PortalMesh);
+        SceneCaptureComponent2DRight->HideComponent(PortalHollowCubeMesh);
+
     }
 
     //Render Target
@@ -52,6 +63,26 @@ APortalVR::APortalVR()
         PortalRenderTargetRight->UpdateResourceImmediate(true);
 
     }
+
+    //BoxTrigger
+    {
+        PortalBoxTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("Portal BoxTrigger"));
+        PortalBoxTrigger->SetupAttachment(RootComponent);
+
+        FScriptDelegate OnBeginDelegate;
+        OnBeginDelegate.BindUFunction(this, TEXT("OnPortalOverlapBegin"));
+        PortalBoxTrigger->OnComponentBeginOverlap.Add(OnBeginDelegate);
+
+        FScriptDelegate OnEndDelegate;
+        OnEndDelegate.BindUFunction(this, TEXT("OnPortalOverlapEnd"));
+        PortalBoxTrigger->OnComponentEndOverlap.Add(OnEndDelegate);
+
+        PortalBoxTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        PortalBoxTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+        PortalBoxTrigger->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+        PortalBoxTrigger->SetGenerateOverlapEvents(true);
+    }
+
 }
 int count = 0;
 
@@ -71,6 +102,12 @@ void APortalVR::BeginPlay()
     PortalMesh->SetMaterial(0, DynMat);
     DynMat->SetTextureParameterValue(RenderTargetParameterNameLeft, PortalRenderTargetLeft);
     DynMat->SetTextureParameterValue(RenderTargetParameterNameRight, PortalRenderTargetRight);
+
+    DynMat = UMaterialInstanceDynamic::Create(PortalHollowCubeMesh->GetMaterial(0), this);
+    PortalHollowCubeMesh->SetMaterial(0, DynMat);
+    DynMat->SetTextureParameterValue(RenderTargetParameterNameLeft, PortalRenderTargetLeft);
+    DynMat->SetTextureParameterValue(RenderTargetParameterNameRight, PortalRenderTargetRight);
+    PortalHollowCubeMesh->SetHiddenInGame(true, true);
 
     GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
     count = 0;   
@@ -102,8 +139,6 @@ void APortalVR::Tick(float DeltaTime)
     {
         count++;
     }
-
-
 
 #if PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 
 
@@ -188,6 +223,45 @@ void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
     {
         ConnectToPortal(OtherPortal);
     }
+
 }
+
+void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (!ActorsToCheckTeleport.Contains(OtherActor))
+    {
+        ActorsToCheckTeleport.Add(OtherActor);
+    }
+    PortalHollowCubeMesh->SetHiddenInGame(false, true);
+    GEngine->GameViewport->EngineShowFlags.DisableOcclusionQueries = true;
+}
+
+void APortalVR::OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+    ActorsToCheckTeleport.Remove(OtherActor);
+    PortalHollowCubeMesh->SetHiddenInGame(true, true);
+    GEngine->GameViewport->EngineShowFlags.DisableOcclusionQueries = false;
+
+}
+
+void APortalVR::Teleport(AActor* Actor)
+{
+    if (!OtherPortal || !Actor) return;
+
+    auto ActorWorldMatrix = Actor->ActorToWorld().ToMatrixWithScale();
+    auto portalWorldToLocalMatrix = GetTransform().ToMatrixWithScale().Inverse();
+    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
+    auto otherPortalWorldMatrix = OtherPortal->GetTransform().ToMatrixWithScale();
+
+    auto portalTransformMatrix = ActorWorldMatrix * portalWorldToLocalMatrix * RotMatrix * otherPortalWorldMatrix;
+
+    auto otherPortalActorNewLocation = portalTransformMatrix.GetOrigin();
+    auto otherPortalActorNewRotation = portalTransformMatrix.Rotator();
+
+    Actor->SetActorLocation(otherPortalActorNewLocation);
+    Actor->SetActorRotation(otherPortalActorNewRotation);
+}
+
+
 
 

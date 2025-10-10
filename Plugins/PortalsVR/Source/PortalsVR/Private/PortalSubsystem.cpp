@@ -69,6 +69,24 @@ void UPortalSubsystem::Tick(float DeltaTime)
 
     #endif 
 
+    for (auto P : ActivePortals)
+    {
+        for (auto Actor : P->ActorsToCheckTeleport)
+        {
+            FVector PortalForward = P->GetActorForwardVector();
+            FVector PortalToActor = (Actor->GetActorLocation() - P->GetActorLocation()).GetSafeNormal();
+
+            auto dot = FVector::DotProduct(PortalForward, PortalToActor);
+
+            UE_LOG(LogTemp, Warning, TEXT("Portal Forward = %s"), *PortalForward.ToString());
+            UE_LOG(LogTemp, Warning, TEXT("Actor To Portal = %s"), *PortalToActor.ToString());
+            UE_LOG(LogTemp, Warning, TEXT("Dot = %f"), dot);
+
+            if (dot >= 0) P->Teleport(Actor);
+        }
+
+    }
+
     leftRendered = false;
     rightRendered = false;
 }
