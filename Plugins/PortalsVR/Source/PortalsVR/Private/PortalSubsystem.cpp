@@ -73,8 +73,15 @@ void UPortalSubsystem::Tick(float DeltaTime)
     {
         for (auto Actor : P->ActorsToCheckTeleport)
         {
+            auto PlayerController = GetWorld()->GetFirstPlayerController();
+            auto PlayerPawn = PlayerController->GetPawn();
+
+            bool IsVRPlayer = false;
+            if (Actor == PlayerPawn) IsVRPlayer = true;
+
+            FVector LocationCheckTeleport = IsVRPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
             FVector PortalForward = P->GetActorForwardVector();
-            FVector PortalToActor = (Actor->GetActorLocation() - P->GetActorLocation()).GetSafeNormal();
+            FVector PortalToActor = (LocationCheckTeleport - P->GetActorLocation()).GetSafeNormal();
 
             auto dot = FVector::DotProduct(PortalForward, PortalToActor);
 
@@ -86,6 +93,7 @@ void UPortalSubsystem::Tick(float DeltaTime)
         }
 
     }
+
 
     leftRendered = false;
     rightRendered = false;
