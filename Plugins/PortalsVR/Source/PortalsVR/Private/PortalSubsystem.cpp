@@ -30,6 +30,9 @@ void UPortalSubsystem::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    FirstFSceneViewExtensionPass = true;
+
+
     #if PORTAL_SUBSYSTEM_STEREOSCOPIC_IN_CHARGE
 
     if (SceneCapture && SceneCapture->SceneProxy)

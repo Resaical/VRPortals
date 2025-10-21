@@ -46,4 +46,6 @@ public:
 
     FTransform lateUpdatedLeftEyeWorldTransform = FTransform::Identity;
     FTransform lateUpdatedRightEyeWorldTransform = FTransform::Identity;
+
+    bool FirstFSceneViewExtensionPass = true;
 };

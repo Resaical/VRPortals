@@ -10,7 +10,6 @@
 #include "IHeadMountedDisplay.h"
 #include "IXRCamera.h"
 
-#include "Components/SceneCaptureComponent2D.h"  
 #include "SceneView.h"                           
 #include "SceneCaptureRendering.h" 
 
@@ -21,19 +20,44 @@ FPortalViewExtension::FPortalViewExtension(const FAutoRegister& AutoRegister)
 
 int i = 0;
 
+// 0 is LEFT, 1 is RIGHT
+std::unordered_map<int, std::pair<APortalVR*, int>> PortalsSceneCapturesMap;
+
 void FPortalViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView)
-{   
+{      
     FSceneInterface* Scene = InView.Family->Scene;
     if (!Scene) return;
     UWorld* World = Scene->GetWorld();
     if (!World) return;
 
+    UPortalSubsystem* Subsystem = World->GetSubsystem<UPortalSubsystem>();
+    if (!Subsystem) return;
+     
+    if (Subsystem->FirstFSceneViewExtensionPass)
+    {
+        PortalsSceneCapturesMap.clear();
+        Subsystem->FirstFSceneViewExtensionPass = false;
+
+        for (TWeakObjectPtr<APortalVR> Portal : Subsystem->ActivePortals)
+        {
+            if (Portal.Get())
+            {
+                // 0 is LEFT, 1 is RIGHT
+
+                int key = Portal->SceneCaptureComponent2DLeft->GetViewState(0)->GetViewKey();
+                PortalsSceneCapturesMap.insert({ key, {Portal.Get(), 0}});
+                key = Portal->SceneCaptureComponent2DRight->GetViewState(0)->GetViewKey();
+                PortalsSceneCapturesMap.insert({ key, {Portal.Get(), 1} });
+            }
+        }
+    }
+
     i = 0;
 
 #if PORTAL_VIEW_EXTENSION_STEREOSCOPIC_IN_CHARGE_GAME_THREAT
 
-
     if ((InView.StereoViewIndex != eSSE_LEFT_EYE) && (InView.StereoViewIndex != eSSE_RIGHT_EYE)) return;    
+
     bool leftEye = InView.StereoViewIndex == eSSE_LEFT_EYE;    
 
     if (UPortalSubsystem* Subsystem = World->GetSubsystem<UPortalSubsystem>())
@@ -113,7 +137,7 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     if (!World || !World->IsGameWorld()) return;
 
     UPortalSubsystem* Subsystem = World->GetSubsystem<UPortalSubsystem>();
-
+    if (!Subsystem) return;
 
 #if PORTAL_REVERT_LATE_XRHMD_UPDATE
 
@@ -129,58 +153,58 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
 
 #if PORTAL_VIEW_EXTENSION_STEREOSCOPIC_IN_CHARGE_RENDER_THREAT 
 
-    if (InView.StereoViewIndex != eSSE_LEFT_EYE && InView.StereoViewIndex != eSSE_RIGHT_EYE)
-    {          
-        int EyeIndex = i % 2;
-        auto Portal = Subsystem->ActivePortals[EyeIndex];
+    if (InView.StereoViewIndex == eSSE_LEFT_EYE || InView.StereoViewIndex == eSSE_RIGHT_EYE) return;
+             
+    int key = InView.GetViewKey();
 
-        if (EyeIndex == eSSE_LEFT_EYE && Portal->leftImageRendered) return;
-        if (EyeIndex == eSSE_RIGHT_EYE && Portal->rightImageRendered) return;
+    auto it = PortalsSceneCapturesMap.find(key);
+    if (it == PortalsSceneCapturesMap.end()) return;
 
-        auto Target = (!EyeIndex) ? Portal->PortalRenderTargetLeft : Portal->PortalRenderTargetRight;
-        auto sceneCapture = (!EyeIndex) ? Portal->OtherPortal->SceneCaptureComponent2DLeft : Portal->OtherPortal->SceneCaptureComponent2DRight;
+    int EyeIndex = it->second.second;
+    APortalVR* Portal = it->second.first;
+        
+    if (EyeIndex == 0 && Portal->leftImageRendered) return;
+    if (EyeIndex == 1 && Portal->rightImageRendered) return;
 
-        auto PlayerController = Scene->GetWorld()->GetFirstPlayerController();
-        auto PlayerPawn = PlayerController->GetPawn();
+    auto PlayerController = Scene->GetWorld()->GetFirstPlayerController();
+    auto PlayerPawn = PlayerController->GetPawn();
 
-        int32 HMDDeviceId = IXRTrackingSystem::HMDDeviceId;
+    int32 HMDDeviceId = IXRTrackingSystem::HMDDeviceId;
 
-        FVector CamLocationLocal = FVector::Zero();
-        FQuat CamRotationLocal = FQuat::Identity;
+    FVector CamLocationLocal = FVector::Zero();
+    FQuat CamRotationLocal = FQuat::Identity;
 
-        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
+    GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
 
-        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
-        auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
-        auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
+    GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
+    auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
+    auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
 
-        FQuat offsetRotator = FQuat::Identity;
-        FVector offsetLocation = FVector(0, 0, 0);
+    FQuat offsetRotator = FQuat::Identity;
+    FVector offsetLocation = FVector(0, 0, 0);
 
-        GEngine->XRSystem->GetRelativeEyePose(HMDDeviceId,EyeIndex, offsetRotator, offsetLocation);
+    GEngine->XRSystem->GetRelativeEyePose(HMDDeviceId,EyeIndex, offsetRotator, offsetLocation);
 
-        FVector EyeLocation = CamRotation.RotateVector(offsetLocation) + CamLocation;
-        FTransform EyeTransform(CamRotation, EyeLocation);
-        FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
+    FVector EyeLocation = CamRotation.RotateVector(offsetLocation) + CamLocation;
+    FTransform EyeTransform(CamRotation, EyeLocation);
+    FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
 
-        auto portalWorldToLocal = Portal->GetTransform().ToMatrixWithScale().Inverse();
-        FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-        auto otherPortalWorld = Portal->OtherPortal->GetTransform().ToMatrixWithScale();
+    auto portalWorldToLocal = Portal->OtherPortal->GetTransform().ToMatrixWithScale().Inverse();
+    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
+    auto otherPortalWorld = Portal->GetTransform().ToMatrixWithScale();
 
-        auto portalTransformMatrix = EyeWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
+    auto portalTransformMatrix = EyeWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
 
-        auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
-        auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
+    auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
+    auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
 
-        InView.ViewLocation = otherPortalCameraNewLocation;
-        InView.ViewRotation = otherPortalCameraNewRotation;
-        InView.UpdateViewMatrix();
+    InView.ViewLocation = otherPortalCameraNewLocation;
+    InView.ViewRotation = otherPortalCameraNewRotation;
+    InView.UpdateViewMatrix();
 
-        if (EyeIndex == eSSE_LEFT_EYE) Portal->leftImageRendered = true;
-        else Portal->rightImageRendered = true;
-    }
-    i++;
-
+    if (EyeIndex == 0) Portal->leftImageRendered = true;
+    else Portal->rightImageRendered = true;
+    
 #endif
 
 }
