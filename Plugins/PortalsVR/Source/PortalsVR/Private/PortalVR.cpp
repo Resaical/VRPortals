@@ -210,8 +210,8 @@ void APortalVR::ConnectToPortal(APortalVR* otherPortal)
     otherPortal->SceneCaptureComponent2DLeft->TextureTarget = PortalRenderTargetLeft;
     otherPortal->SceneCaptureComponent2DRight->TextureTarget = PortalRenderTargetRight;
 
-    OtherPortal->SceneCaptureComponent2DLeft->HiddenActors.Add(this);
-    OtherPortal->SceneCaptureComponent2DRight->HiddenActors.Add(this);
+    //OtherPortal->SceneCaptureComponent2DLeft->HiddenActors.Add(this);
+    //OtherPortal->SceneCaptureComponent2DRight->HiddenActors.Add(this);
 
 }
 
@@ -233,6 +233,7 @@ void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor
         ActorsToCheckTeleport.Add(OtherActor);
     }
     PortalHollowCubeMesh->SetHiddenInGame(false, true);
+    PortalMesh->SetHiddenInGame(true, true);
     GEngine->GameViewport->EngineShowFlags.DisableOcclusionQueries = true;
 }
 
@@ -240,6 +241,7 @@ void APortalVR::OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* 
 {
     ActorsToCheckTeleport.Remove(OtherActor);
     PortalHollowCubeMesh->SetHiddenInGame(true, true);
+    PortalMesh->SetHiddenInGame(false, true);
     GEngine->GameViewport->EngineShowFlags.DisableOcclusionQueries = false;
 
 }
