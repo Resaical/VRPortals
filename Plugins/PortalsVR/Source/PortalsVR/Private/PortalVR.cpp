@@ -91,7 +91,9 @@ void APortalVR::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (GEngine && GEngine->XRSystem)
+    GEngine->XRSystem->GetHMDDevice()->IsHMDConnected();
+
+    if (GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
     {
         const auto RenderTargetSize = GEngine->XRSystem->GetHMDDevice()->GetIdealRenderTargetSize();
         PortalRenderTargetLeft->ResizeTarget(RenderTargetSize.X, RenderTargetSize.Y);
@@ -124,7 +126,7 @@ void APortalVR::Tick(float DeltaTime)
 
     if (count == 5)
     {
-        if (GEngine && GEngine->XRSystem.IsValid())
+        if (GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
         {
             IStereoRendering* StereoDevice = GEngine->XRSystem->GetStereoRenderingDevice().Get();
             if (StereoDevice)
@@ -147,6 +149,7 @@ void APortalVR::Tick(float DeltaTime)
         auto Target = (eyeIndex == eSSE_LEFT_EYE) ? PortalRenderTargetLeft : PortalRenderTargetRight;
         auto sceneCapture = (eyeIndex == eSSE_LEFT_EYE) ? OtherPortal->SceneCaptureComponent2DLeft : OtherPortal->SceneCaptureComponent2DRight;
 
+        if (!GEngine && !GEngine->XRSystem.IsValid() && !GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) return;
         auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(eyeIndex);
 
 
@@ -222,6 +225,7 @@ void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
     if (OtherPortal)
     {
         ConnectToPortal(OtherPortal);
+        OtherPortal->ConnectToPortal(this);
     }
 
 }

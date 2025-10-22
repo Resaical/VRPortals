@@ -18,8 +18,6 @@ public:
     virtual void Initialize(FSubsystemCollectionBase& Collection) override
     {
         Super::Initialize(Collection);
-
-        ViewExtension = FSceneViewExtensions::NewExtension<FPortalViewExtension>();
     }
 
     virtual void Deinitialize() override
@@ -36,7 +34,11 @@ public:
 
     virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
+
+
     virtual void Tick(float DeltaTime) override;
+
+    FDelegateHandle EndPlayDelegate;
 
     TSharedPtr<FPortalViewExtension, ESPMode::ThreadSafe> ViewExtension;
     TArray<TWeakObjectPtr<APortalVR>> ActivePortals;

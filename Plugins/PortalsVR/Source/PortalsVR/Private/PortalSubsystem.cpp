@@ -10,26 +10,17 @@
 
 
 
+
 void UPortalSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
-    #if PORTAL_SUBSYSTEM_STEREOSCOPIC_IN_CHARGE   
-
-    if (IXRTrackingSystem* XRSystem = GEngine->XRSystem.Get())
-    {
-        if (TSharedPtr<IXRCamera, ESPMode::ThreadSafe> XRCamera = XRSystem->GetXRCamera())
-        {
-            // Register SceneCapture for late update just like the main camera
-            XRCamera->SetupLateUpdate(lateUpdatedLeftEyeWorldTransform);
-        }
-    }
-
-    #endif
+    if(GEngine && GEngine->XRSystem && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) 
+        ViewExtension = FSceneViewExtensions::NewExtension<FPortalViewExtension>();
 }
 
 void UPortalSubsystem::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-
+   
     FirstFSceneViewExtensionPass = true;
 
 
@@ -79,10 +70,10 @@ void UPortalSubsystem::Tick(float DeltaTime)
             auto PlayerController = GetWorld()->GetFirstPlayerController();
             auto PlayerPawn = PlayerController->GetPawn();
 
-            bool IsVRPlayer = false;
-            if (Actor == PlayerPawn) IsVRPlayer = true;
+            bool IsPlayer = false;
+            if (Actor == PlayerPawn) IsPlayer = true;
 
-            FVector LocationCheckTeleport = IsVRPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
+            FVector LocationCheckTeleport = IsPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
             FVector PortalForward = P->GetActorForwardVector();
             FVector PortalToActor = (LocationCheckTeleport - P->GetActorLocation()).GetSafeNormal();
 
