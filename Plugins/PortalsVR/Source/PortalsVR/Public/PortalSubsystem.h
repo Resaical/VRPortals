@@ -38,7 +38,6 @@ public:
 
     virtual void Tick(float DeltaTime) override;
 
-    FDelegateHandle EndPlayDelegate;
 
     TSharedPtr<FPortalViewExtension, ESPMode::ThreadSafe> ViewExtension;
     TArray<TWeakObjectPtr<APortalVR>> ActivePortals;

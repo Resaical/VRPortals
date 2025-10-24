@@ -8,6 +8,7 @@
 #include "IXRTrackingSystem.h"
 #include "IHeadMountedDisplay.h"
 #include "IXRCamera.h"
+#include <PortalFunctions.h>
 
 /// Sets default values
 APortalVR::APortalVR()
@@ -146,6 +147,8 @@ void APortalVR::Tick(float DeltaTime)
 
     for (int eyeIndex = eSSE_LEFT_EYE; eyeIndex <= eSSE_RIGHT_EYE; eyeIndex++)
     {
+        if (!OtherPortal) return;
+
         auto Target = (eyeIndex == eSSE_LEFT_EYE) ? PortalRenderTargetLeft : PortalRenderTargetRight;
         auto sceneCapture = (eyeIndex == eSSE_LEFT_EYE) ? OtherPortal->SceneCaptureComponent2DLeft : OtherPortal->SceneCaptureComponent2DRight;
 
@@ -220,14 +223,9 @@ void APortalVR::ConnectToPortal(APortalVR* otherPortal)
 
 void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-    Super::PostEditChangeProperty(PropertyChangedEvent);
+    Super::PostEditChangeProperty(PropertyChangedEvent);    
 
-    if (OtherPortal)
-    {
-        ConnectToPortal(OtherPortal);
-        OtherPortal->ConnectToPortal(this);
-    }
-
+    if(OtherPortal != OldOtherPortal) PortalTools::ConnectPortalPair(this, OtherPortal, true);
 }
 
 void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -250,23 +248,6 @@ void APortalVR::OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* 
 
 }
 
-void APortalVR::Teleport(AActor* Actor)
-{
-    if (!OtherPortal || !Actor) return;
-
-    auto ActorWorldMatrix = Actor->ActorToWorld().ToMatrixWithScale();
-    auto portalWorldToLocalMatrix = GetTransform().ToMatrixWithScale().Inverse();
-    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-    auto otherPortalWorldMatrix = OtherPortal->GetTransform().ToMatrixWithScale();
-
-    auto portalTransformMatrix = ActorWorldMatrix * portalWorldToLocalMatrix * RotMatrix * otherPortalWorldMatrix;
-
-    auto otherPortalActorNewLocation = portalTransformMatrix.GetOrigin();
-    auto otherPortalActorNewRotation = portalTransformMatrix.Rotator();
-
-    Actor->SetActorLocation(otherPortalActorNewLocation);
-    Actor->SetActorRotation(otherPortalActorNewRotation);
-}
 
 
 

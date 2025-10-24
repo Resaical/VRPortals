@@ -8,7 +8,7 @@
 #include <Components/BoxComponent.h>
 #include "PortalVR.generated.h"
 
-#define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 1
+#define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 0
 
 UCLASS()
 
@@ -46,9 +46,6 @@ public:
 	void OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	UFUNCTION(CallInEditor, Category = "Portal", DisplayName = "Teleport")
-	void Teleport(AActor* Actor);
-
 	//Mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UStaticMeshComponent* PortalMesh;
@@ -72,7 +69,8 @@ public:
 
 	// Linking objects
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	APortalVR* OtherPortal;
+	APortalVR* OtherPortal = nullptr;
+	APortalVR* OldOtherPortal = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USceneCaptureComponent2D* SceneCaptureComponent2DLeft;

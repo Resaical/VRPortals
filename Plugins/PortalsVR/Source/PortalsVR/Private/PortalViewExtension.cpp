@@ -42,8 +42,9 @@ void FPortalViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView&
         {
             if (Portal.Get())
             {
-                // 0 is LEFT, 1 is RIGHT
+                if (!Portal->OtherPortal) return;
 
+                // 0 is LEFT, 1 is RIGHT
                 int key = Portal->SceneCaptureComponent2DLeft->GetViewState(0)->GetViewKey();
                 PortalsSceneCapturesMap.insert({ key, {Portal.Get(), 0}});
                 key = Portal->SceneCaptureComponent2DRight->GetViewState(0)->GetViewKey();
@@ -162,6 +163,8 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
 
     int EyeIndex = it->second.second;
     APortalVR* Portal = it->second.first;
+
+    if (!Portal->OtherPortal) return;
         
     if (EyeIndex == 0 && Portal->leftImageRendered) return;
     if (EyeIndex == 1 && Portal->rightImageRendered) return;
@@ -203,8 +206,12 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
     auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
 
+    auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(EyeIndex);
+
+
     InView.ViewLocation = eyeSyncronizedLocation;
     InView.ViewRotation = eyeSyncronizedRotation.Rotator();
+    InView.UpdateProjectionMatrix(proj);
     InView.UpdateViewMatrix();
 
     if (EyeIndex == 0) Portal->leftImageRendered = true;
