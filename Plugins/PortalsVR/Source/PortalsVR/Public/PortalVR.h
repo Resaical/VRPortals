@@ -8,7 +8,7 @@
 #include <Components/BoxComponent.h>
 #include "PortalVR.generated.h"
 
-#define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 1
+#define PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 0
 
 UCLASS()
 
@@ -24,6 +24,10 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+	};
 protected:
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -31,10 +35,6 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
-	void OnXRLateUpdate();	
-
-	void ConnectToPortal(APortalVR* otherPortal);
 
 	//Teleport
 	UFUNCTION()
@@ -45,9 +45,6 @@ public:
 	UFUNCTION()
 	void OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
-	UFUNCTION(CallInEditor, Category = "Portal", DisplayName = "Teleport")
-	void Teleport(AActor* Actor);
 
 	//Mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -71,8 +68,11 @@ public:
 	FName RenderTargetParameterNameRight = TEXT("RenderTargetPortalRight");
 
 	// Linking objects
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	APortalVR* OtherPortal;
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly)
+	APortalVR* OtherPortal = nullptr;
+
+	UPROPERTY()
+	APortalVR* OldOtherPortalInEditor = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USceneCaptureComponent2D* SceneCaptureComponent2DLeft;

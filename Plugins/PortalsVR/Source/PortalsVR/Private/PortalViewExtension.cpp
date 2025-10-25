@@ -9,9 +9,9 @@
 #include "IXRTrackingSystem.h"
 #include "IHeadMountedDisplay.h"
 #include "IXRCamera.h"
-
 #include "SceneView.h"                           
 #include "SceneCaptureRendering.h" 
+#include <PortalFunctions.h>
 
 FPortalViewExtension::FPortalViewExtension(const FAutoRegister& AutoRegister)
     : FSceneViewExtensionBase(AutoRegister)
@@ -35,15 +35,16 @@ void FPortalViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView&
      
     if (Subsystem->FirstFSceneViewExtensionPass)
     {
-        PortalsSceneCapturesMap.clear();
         Subsystem->FirstFSceneViewExtensionPass = false;
+        PortalsSceneCapturesMap.clear();
 
         for (TWeakObjectPtr<APortalVR> Portal : Subsystem->ActivePortals)
         {
             if (Portal.Get())
             {
-                // 0 is LEFT, 1 is RIGHT
+                if (!Portal->OtherPortal) continue;
 
+                // 0 is LEFT, 1 is RIGHT
                 int key = Portal->SceneCaptureComponent2DLeft->GetViewState(0)->GetViewKey();
                 PortalsSceneCapturesMap.insert({ key, {Portal.Get(), 0}});
                 key = Portal->SceneCaptureComponent2DRight->GetViewState(0)->GetViewKey();
@@ -162,6 +163,8 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
 
     int EyeIndex = it->second.second;
     APortalVR* Portal = it->second.first;
+
+    if (!Portal->OtherPortal) return;
         
     if (EyeIndex == 0 && Portal->leftImageRendered) return;
     if (EyeIndex == 1 && Portal->rightImageRendered) return;
@@ -189,6 +192,11 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     FTransform EyeTransform(CamRotation, EyeLocation);
     FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
 
+    FVector eyeSyncronizedLocation;
+    PortalTools::Teleport::TeleportWorldLocationMirrored(Portal->OtherPortal, Portal, EyeLocation, eyeSyncronizedLocation);
+    FQuat eyeSyncronizedRotation;
+    PortalTools::Teleport::TeleportWorldRotationMirrored(Portal->OtherPortal, Portal, CamRotation, eyeSyncronizedRotation);
+
     auto portalWorldToLocal = Portal->OtherPortal->GetTransform().ToMatrixWithScale().Inverse();
     FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
     auto otherPortalWorld = Portal->GetTransform().ToMatrixWithScale();
@@ -198,8 +206,12 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
     auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
 
-    InView.ViewLocation = otherPortalCameraNewLocation;
-    InView.ViewRotation = otherPortalCameraNewRotation;
+    auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(EyeIndex);
+
+
+    InView.ViewLocation = eyeSyncronizedLocation;
+    InView.ViewRotation = eyeSyncronizedRotation.Rotator();
+    InView.UpdateProjectionMatrix(proj);
     InView.UpdateViewMatrix();
 
     if (EyeIndex == 0) Portal->leftImageRendered = true;

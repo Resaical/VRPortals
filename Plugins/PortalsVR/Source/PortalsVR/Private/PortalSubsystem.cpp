@@ -7,29 +7,19 @@
 #include "IXRTrackingSystem.h"
 #include "IHeadMountedDisplay.h"
 #include "IXRCamera.h"
-
+#include <PortalFunctions.h>
 
 
 void UPortalSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
-    #if PORTAL_SUBSYSTEM_STEREOSCOPIC_IN_CHARGE   
-
-    if (IXRTrackingSystem* XRSystem = GEngine->XRSystem.Get())
-    {
-        if (TSharedPtr<IXRCamera, ESPMode::ThreadSafe> XRCamera = XRSystem->GetXRCamera())
-        {
-            // Register SceneCapture for late update just like the main camera
-            XRCamera->SetupLateUpdate(lateUpdatedLeftEyeWorldTransform);
-        }
-    }
-
-    #endif
+    if(GEngine && GEngine->XRSystem && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) 
+        ViewExtension = FSceneViewExtensions::NewExtension<FPortalViewExtension>();
 }
 
 void UPortalSubsystem::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-
+   
     FirstFSceneViewExtensionPass = true;
 
 
@@ -74,25 +64,25 @@ void UPortalSubsystem::Tick(float DeltaTime)
 
     for (auto P : ActivePortals)
     {
-        for (auto Actor : P->ActorsToCheckTeleport)
+        if (!P->OtherPortal) continue;
+
+        TArray<AActor*> SafeCopy = P->ActorsToCheckTeleport;
+        if (SafeCopy.IsEmpty())continue;
+
+        for (auto Actor : SafeCopy)
         {
             auto PlayerController = GetWorld()->GetFirstPlayerController();
             auto PlayerPawn = PlayerController->GetPawn();
 
-            bool IsVRPlayer = false;
-            if (Actor == PlayerPawn) IsVRPlayer = true;
+            bool IsPlayer = false;
+            if (Actor == PlayerPawn) IsPlayer = true;
 
-            FVector LocationCheckTeleport = IsVRPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
+            FVector LocationCheckTeleport = IsPlayer ? PlayerController->PlayerCameraManager->GetCameraLocation() : Actor->GetActorLocation();
             FVector PortalForward = P->GetActorForwardVector();
             FVector PortalToActor = (LocationCheckTeleport - P->GetActorLocation()).GetSafeNormal();
 
             auto dot = FVector::DotProduct(PortalForward, PortalToActor);
-
-            UE_LOG(LogTemp, Warning, TEXT("Portal Forward = %s"), *PortalForward.ToString());
-            UE_LOG(LogTemp, Warning, TEXT("Actor To Portal = %s"), *PortalToActor.ToString());
-            UE_LOG(LogTemp, Warning, TEXT("Dot = %f"), dot);
-
-            if (dot >= 0) P->Teleport(Actor);
+            if (dot >= 0) PortalTools::Teleport::TeleportActor(Actor, P.Get());
         }
 
     }

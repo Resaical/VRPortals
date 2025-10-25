@@ -8,6 +8,7 @@
 #include "IXRTrackingSystem.h"
 #include "IHeadMountedDisplay.h"
 #include "IXRCamera.h"
+#include <PortalFunctions.h>
 
 /// Sets default values
 APortalVR::APortalVR()
@@ -38,7 +39,7 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DLeft->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DLeft->HideComponent(PortalMesh);
         SceneCaptureComponent2DLeft->HideComponent(PortalHollowCubeMesh);
-
+        SceneCaptureComponent2DLeft->SetFlags(RF_Transactional);
 
         SceneCaptureComponent2DRight = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Right"));
         SceneCaptureComponent2DRight->SetupAttachment(RootComponent);
@@ -47,21 +48,22 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DRight->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DRight->HideComponent(PortalMesh);
         SceneCaptureComponent2DRight->HideComponent(PortalHollowCubeMesh);
-
+        SceneCaptureComponent2DRight->SetFlags(RF_Transactional);
     }
 
     //Render Target
     {
-        PortalRenderTargetLeft = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Left"));
+        FString LeftRTName = FString::Printf(TEXT("%s_PortalRenderTargetLeft"), *GetName());
+        PortalRenderTargetLeft = CreateDefaultSubobject<UTextureRenderTarget2D>(*LeftRTName);
         PortalRenderTargetLeft->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
         PortalRenderTargetLeft->InitAutoFormat(1024, 1024);
-        PortalRenderTargetLeft->UpdateResourceImmediate(true);
+        PortalRenderTargetLeft->UpdateResourceImmediate(true);        
 
-        PortalRenderTargetRight = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Right"));
+        LeftRTName = FString::Printf(TEXT("%s_PortalRenderTargetRight"), *GetName());
+        PortalRenderTargetRight = CreateDefaultSubobject<UTextureRenderTarget2D>(*LeftRTName);
         PortalRenderTargetRight->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
         PortalRenderTargetRight->InitAutoFormat(1024, 1024);
         PortalRenderTargetRight->UpdateResourceImmediate(true);
-
     }
 
     //BoxTrigger
@@ -91,7 +93,9 @@ void APortalVR::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (GEngine && GEngine->XRSystem)
+    GEngine->XRSystem->GetHMDDevice()->IsHMDConnected();
+
+    if (GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
     {
         const auto RenderTargetSize = GEngine->XRSystem->GetHMDDevice()->GetIdealRenderTargetSize();
         PortalRenderTargetLeft->ResizeTarget(RenderTargetSize.X, RenderTargetSize.Y);
@@ -111,6 +115,9 @@ void APortalVR::BeginPlay()
 
     GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
     count = 0;   
+
+    //if (OtherPortal)PortalTools::ConnectPortalPair(this, OtherPortal, true);
+    //else PortalTools::DisconnectPortalPair(this, true);
 }
 
 
@@ -122,9 +129,11 @@ void APortalVR::Tick(float DeltaTime)
     leftImageRendered = false;
     rightImageRendered = false;
 
+    //DrawDebugLine( GetWorld(),this->GetActorLocation(), OtherPortal->GetActorLocation(), FColor::Blue, true, 0.1f, 0, 5.f);
+
     if (count == 5)
     {
-        if (GEngine && GEngine->XRSystem.IsValid())
+        if (GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
         {
             IStereoRendering* StereoDevice = GEngine->XRSystem->GetStereoRenderingDevice().Get();
             if (StereoDevice)
@@ -144,9 +153,12 @@ void APortalVR::Tick(float DeltaTime)
 
     for (int eyeIndex = eSSE_LEFT_EYE; eyeIndex <= eSSE_RIGHT_EYE; eyeIndex++)
     {
+        if (!OtherPortal) return;
+
         auto Target = (eyeIndex == eSSE_LEFT_EYE) ? PortalRenderTargetLeft : PortalRenderTargetRight;
         auto sceneCapture = (eyeIndex == eSSE_LEFT_EYE) ? OtherPortal->SceneCaptureComponent2DLeft : OtherPortal->SceneCaptureComponent2DRight;
 
+        if (!GEngine && !GEngine->XRSystem.IsValid() && !GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) return;
         auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(eyeIndex);
 
 
@@ -199,31 +211,11 @@ void APortalVR::Tick(float DeltaTime)
 #endif
 }
 
-void APortalVR::OnXRLateUpdate()
-{
-
-}
-
-void APortalVR::ConnectToPortal(APortalVR* otherPortal)
-{
-    OtherPortal = otherPortal;
-    otherPortal->SceneCaptureComponent2DLeft->TextureTarget = PortalRenderTargetLeft;
-    otherPortal->SceneCaptureComponent2DRight->TextureTarget = PortalRenderTargetRight;
-
-    //OtherPortal->SceneCaptureComponent2DLeft->HiddenActors.Add(this);
-    //OtherPortal->SceneCaptureComponent2DRight->HiddenActors.Add(this);
-
-}
-
 void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-    Super::PostEditChangeProperty(PropertyChangedEvent);
+    Super::PostEditChangeProperty(PropertyChangedEvent);    
 
-    if (OtherPortal)
-    {
-        ConnectToPortal(OtherPortal);
-    }
-
+    if(OtherPortal != OldOtherPortalInEditor) PortalTools::ConnectPortalPair(this, OtherPortal, true);
 }
 
 void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -246,23 +238,6 @@ void APortalVR::OnPortalOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* 
 
 }
 
-void APortalVR::Teleport(AActor* Actor)
-{
-    if (!OtherPortal || !Actor) return;
-
-    auto ActorWorldMatrix = Actor->ActorToWorld().ToMatrixWithScale();
-    auto portalWorldToLocalMatrix = GetTransform().ToMatrixWithScale().Inverse();
-    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-    auto otherPortalWorldMatrix = OtherPortal->GetTransform().ToMatrixWithScale();
-
-    auto portalTransformMatrix = ActorWorldMatrix * portalWorldToLocalMatrix * RotMatrix * otherPortalWorldMatrix;
-
-    auto otherPortalActorNewLocation = portalTransformMatrix.GetOrigin();
-    auto otherPortalActorNewRotation = portalTransformMatrix.Rotator();
-
-    Actor->SetActorLocation(otherPortalActorNewLocation);
-    Actor->SetActorRotation(otherPortalActorNewRotation);
-}
 
 
 
