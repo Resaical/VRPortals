@@ -93,8 +93,6 @@ void APortalVR::BeginPlay()
 {
     Super::BeginPlay();
 
-    GEngine->XRSystem->GetHMDDevice()->IsHMDConnected();
-
     if (GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
     {
         const auto RenderTargetSize = GEngine->XRSystem->GetHMDDevice()->GetIdealRenderTargetSize();
@@ -113,7 +111,7 @@ void APortalVR::BeginPlay()
     DynMat->SetTextureParameterValue(RenderTargetParameterNameRight, PortalRenderTargetRight);
     PortalHollowCubeMesh->SetHiddenInGame(true, true);
 
-    GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
+    GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortalsXR.Add(this);
     count = 0;   
 
     //if (OtherPortal)PortalTools::ConnectPortalPair(this, OtherPortal, true);
@@ -148,74 +146,17 @@ void APortalVR::Tick(float DeltaTime)
     {
         count++;
     }
-
-#if PORTAL_ACTOR_STEREOSCOPIC_IN_CHARGE 
-
-    for (int eyeIndex = eSSE_LEFT_EYE; eyeIndex <= eSSE_RIGHT_EYE; eyeIndex++)
-    {
-        if (!OtherPortal) return;
-
-        auto Target = (eyeIndex == eSSE_LEFT_EYE) ? PortalRenderTargetLeft : PortalRenderTargetRight;
-        auto sceneCapture = (eyeIndex == eSSE_LEFT_EYE) ? OtherPortal->SceneCaptureComponent2DLeft : OtherPortal->SceneCaptureComponent2DRight;
-
-        if (!GEngine && !GEngine->XRSystem.IsValid() && !GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) return;
-        auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(eyeIndex);
-
-
-        auto PlayerController = GetWorld()->GetFirstPlayerController();
-        auto PlayerPawn = PlayerController->GetPawn();
-
-        int32 HMDDeviceId = IXRTrackingSystem::HMDDeviceId;
-
-        FVector CamLocationLocal = FVector::Zero();
-        FQuat CamRotationLocal = FQuat::Identity;
-
-        GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
-        auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
-        auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
-
-        FQuat offsetRotator = FQuat::Identity;
-        FVector offsetLocation = FVector(0,0,0);
-
-        GEngine->XRSystem->GetRelativeEyePose(HMDDeviceId, eyeIndex, offsetRotator, offsetLocation);  
-
-        FVector EyeLocation = CamRotation.RotateVector(offsetLocation) + CamLocation;
-        FTransform EyeTransform(CamRotation, EyeLocation);
-        FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
-
-        if (eyeIndex == eSSE_LEFT_EYE) 
-        {
-            UE_LOG(LogTemp, Log, TEXT("Cam Location HMD : %s\n"), *CamLocation.ToString());
-        }
-
-        auto portalWorldToLocal = GetTransform().ToMatrixWithScale().Inverse();
-        FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-        auto otherPortalWorld = OtherPortal->GetTransform().ToMatrixWithScale();
-
-        auto portalTransformMatrix = EyeWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
-
-        auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
-        auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
-
-        sceneCapture->CustomProjectionMatrix = proj;
-        sceneCapture->SetWorldLocationAndRotation(otherPortalCameraNewLocation, otherPortalCameraNewRotation);
-
-    #if PORTAL_REVERT_LATE_XRHMD_UPDATE
-
-        if(eyeIndex == eSSE_LEFT_EYE) GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedLeftEyeWorldTransform = EyeTransform;
-        else GetWorld()->GetSubsystem<UPortalSubsystem>()->lateUpdatedRightEyeWorldTransform = EyeTransform;
-
-    #endif
-    }
-
-#endif
 }
 
 void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);    
 
-    if(OtherPortal != OldOtherPortalInEditor) PortalTools::ConnectPortalPair(this, OtherPortal, true);
+    if (OtherPortal != OldOtherPortalInEditor)
+    {
+        if (OtherPortal) PortalTools::XR::ConnectPortalPairXR(this, OtherPortal);
+        else PortalTools::XR::DisconnectPortalPairXR(this);
+    }
 }
 
 void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)

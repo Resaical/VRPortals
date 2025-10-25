@@ -38,15 +38,12 @@ public:
 
     virtual void Tick(float DeltaTime) override;
 
+    TArray<TWeakObjectPtr<APortal>> ActivePortals;
 
     TSharedPtr<FPortalViewExtension, ESPMode::ThreadSafe> ViewExtension;
-    TArray<TWeakObjectPtr<APortalVR>> ActivePortals;
+    TArray<TWeakObjectPtr<APortalVR>> ActivePortalsXR;
 
-    bool leftRendered = false;
-    bool rightRendered = false;
-
-    FTransform lateUpdatedLeftEyeWorldTransform = FTransform::Identity;
-    FTransform lateUpdatedRightEyeWorldTransform = FTransform::Identity;
+    bool IsXRGame = false;
 
     bool FirstFSceneViewExtensionPass = true;
 };
