@@ -8,19 +8,29 @@
 
 struct PortalTools
 {
+	struct XR
+	{
+		static bool ConnectPortalPairXR(APortalVR* PortalA, APortalVR* PortalB);
+		static bool DisconnectPortalPairXR(APortalVR* Portal);
 
-	static bool ConnectPortalPair(APortalVR* PortalA, APortalVR* PortalB, bool IsXR);
-	static bool DisconnectPortalPair(APortalVR* Portal, bool IsXR);
+		static bool TeleportWorldLocationXR(const APortalVR* portalIn, const APortalVR* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
+		static bool TeleportWorldRotationXR(const APortalVR* portalIn, const APortalVR* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);
+		static bool TeleportActorTroughPortalMirroredXR(AActor* ActorToTeleport, const APortalVR* PortalIn);
 
-	struct Teleport
-	{		
-		static bool TeleportWorldLocation(const APortalVR* portalIn, const APortalVR* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
-		static bool TeleportWorldRotation(const APortalVR* portalIn, const APortalVR* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);
-		static bool TeleportActor(AActor* ActorToTeleport, const APortalVR* PortalIn);
-
-		static bool TeleportWorldLocationMirrored(const APortalVR* portalIn, const APortalVR* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
-		static bool TeleportWorldRotationMirrored(const APortalVR* portalIn, const APortalVR* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);
-		
+		static bool TeleportWorldLocationMirroredXR(const APortalVR* portalIn, const APortalVR* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
+		static bool TeleportWorldRotationMirroredXR(const APortalVR* portalIn, const APortalVR* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);
 	};
-	//static AActor* CreateVisualCopy(AActor* SourceActor, APortal* portalIn, APortal* portalOut);
+
+	struct FlatScreen
+	{
+		static bool ConnectPortalPair(APortal* PortalA, APortal* PortalB);
+		static bool DisconnectPortalPair(APortal* Portal);
+
+		static bool TeleportWorldLocation(const APortal* portalIn, const APortal* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
+		static bool TeleportWorldRotation(const APortal* portalIn, const APortal* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);			
+		static bool TeleportActorTroughPortalMirrored(AActor* ActorToTeleport, const APortal* PortalIn);
+
+		static bool TeleportWorldLocationMirrored(const APortal* portalIn, const APortal* portalOut, const FVector& worldLocationIn, FVector& worldLocationOut);
+		static bool TeleportWorldRotationMirrored(const APortal* portalIn, const APortal* portalOut, const FQuat& worldLocationIn, FQuat& worldLocationOut);
+	};
 };

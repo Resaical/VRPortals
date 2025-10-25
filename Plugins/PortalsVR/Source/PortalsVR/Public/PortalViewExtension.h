@@ -25,9 +25,6 @@ public:
 
     virtual void PreRenderView_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& InView) override;
 
-    virtual void PreRenderBasePass_RenderThread(FRDGBuilder& GraphBuilder, bool bDepthBufferIsPopulated) override;
-
-
     virtual bool IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const override { return true; };
 
 
