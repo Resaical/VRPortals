@@ -178,8 +178,6 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     FQuat CamRotationLocal = FQuat::Identity;
 
     GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
-
-    GEngine->XRSystem->GetCurrentPose(HMDDeviceId, CamRotationLocal, CamLocationLocal);
     auto CamLocation = PlayerPawn->ActorToWorld().TransformPosition(CamLocationLocal);
     auto CamRotation = PlayerPawn->ActorToWorld().TransformRotation(CamRotationLocal);
 
@@ -189,25 +187,14 @@ void FPortalViewExtension::PreRenderView_RenderThread(FRDGBuilder& GraphBuilder,
     GEngine->XRSystem->GetRelativeEyePose(HMDDeviceId,EyeIndex, offsetRotator, offsetLocation);
 
     FVector EyeLocation = CamRotation.RotateVector(offsetLocation) + CamLocation;
-    FTransform EyeTransform(CamRotation, EyeLocation);
-    FMatrix EyeWorld = EyeTransform.ToMatrixWithScale();
 
     FVector eyeSyncronizedLocation;
     PortalTools::Teleport::TeleportWorldLocationMirrored(Portal->OtherPortal, Portal, EyeLocation, eyeSyncronizedLocation);
     FQuat eyeSyncronizedRotation;
     PortalTools::Teleport::TeleportWorldRotationMirrored(Portal->OtherPortal, Portal, CamRotation, eyeSyncronizedRotation);
 
-    auto portalWorldToLocal = Portal->OtherPortal->GetTransform().ToMatrixWithScale().Inverse();
-    FMatrix RotMatrix = FRotationMatrix(FRotator(0, 180.0f, 0));
-    auto otherPortalWorld = Portal->GetTransform().ToMatrixWithScale();
-
-    auto portalTransformMatrix = EyeWorld * portalWorldToLocal * RotMatrix * otherPortalWorld;
-
-    auto otherPortalCameraNewLocation = portalTransformMatrix.GetOrigin();
-    auto otherPortalCameraNewRotation = portalTransformMatrix.Rotator();
 
     auto proj = GEngine->XRSystem->GetStereoRenderingDevice()->GetStereoProjectionMatrix(EyeIndex);
-
 
     InView.ViewLocation = eyeSyncronizedLocation;
     InView.ViewRotation = eyeSyncronizedRotation.Rotator();
