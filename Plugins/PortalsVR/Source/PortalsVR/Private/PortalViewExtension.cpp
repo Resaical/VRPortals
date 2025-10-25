@@ -35,14 +35,14 @@ void FPortalViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView&
      
     if (Subsystem->FirstFSceneViewExtensionPass)
     {
-        PortalsSceneCapturesMap.clear();
         Subsystem->FirstFSceneViewExtensionPass = false;
+        PortalsSceneCapturesMap.clear();
 
         for (TWeakObjectPtr<APortalVR> Portal : Subsystem->ActivePortals)
         {
             if (Portal.Get())
             {
-                if (!Portal->OtherPortal) return;
+                if (!Portal->OtherPortal) continue;
 
                 // 0 is LEFT, 1 is RIGHT
                 int key = Portal->SceneCaptureComponent2DLeft->GetViewState(0)->GetViewKey();

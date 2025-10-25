@@ -5,7 +5,7 @@
 
 namespace
 {
-    bool DisconnectPortal(APortalVR* Portal, bool IsXR)
+    bool UnlinkPortalReferences(APortalVR* Portal, bool IsXR)
     {
         if (!Portal) return false;
 
@@ -19,8 +19,32 @@ namespace
             //To fill for flat screen games.
         }
         Portal->OtherPortal = nullptr;
-        Portal->OldOtherPortal = nullptr;
+        Portal->OldOtherPortalInEditor = nullptr;
 
+        return true;
+    }
+    bool LinkPortalReferences(APortalVR* PortalA, APortalVR* PortalB, bool IsXR)
+    {
+        if (!PortalA || !PortalB) return false;
+
+        PortalA->OtherPortal = PortalB;
+        PortalA->OldOtherPortalInEditor = PortalB;
+
+        PortalB->OtherPortal = PortalA;
+        PortalB->OldOtherPortalInEditor = PortalA;
+
+        if (IsXR)
+        {
+            PortalA->SceneCaptureComponent2DLeft->TextureTarget = PortalB->PortalRenderTargetLeft;
+            PortalA->SceneCaptureComponent2DRight->TextureTarget = PortalB->PortalRenderTargetRight;
+
+            PortalB->SceneCaptureComponent2DLeft->TextureTarget = PortalA->PortalRenderTargetLeft;
+            PortalB->SceneCaptureComponent2DRight->TextureTarget = PortalA->PortalRenderTargetRight;
+        }
+        else
+        {
+            //Flat screen
+        }
         return true;
     }
 }
@@ -125,24 +149,7 @@ bool PortalTools::ConnectPortalPair(APortalVR* PortalA, APortalVR* PortalB, bool
     DisconnectPortalPair(PortalA, IsXR);
     DisconnectPortalPair(PortalB, IsXR);
 
-    PortalA->OtherPortal = PortalB;
-    PortalA->OldOtherPortal = PortalB;
-
-    PortalB->OtherPortal = PortalA;
-    PortalB->OldOtherPortal = PortalA;
-
-    if (IsXR)
-    {
-        PortalA->SceneCaptureComponent2DLeft->TextureTarget = PortalB->PortalRenderTargetLeft;
-        PortalA->SceneCaptureComponent2DRight->TextureTarget = PortalB->PortalRenderTargetRight;
-        PortalB->SceneCaptureComponent2DLeft->TextureTarget = PortalA->PortalRenderTargetLeft;
-        PortalB->SceneCaptureComponent2DRight->TextureTarget = PortalA->PortalRenderTargetRight;
-    }
-    else
-    {
-        //To fill for flat screen games.
-    }
-    
+    LinkPortalReferences(PortalA, PortalB, IsXR);
     return true;
 }
 
@@ -150,8 +157,8 @@ bool PortalTools::DisconnectPortalPair(APortalVR* Portal, bool IsXR)
 {
     if (!Portal) return false;
 
-    if (Portal->OldOtherPortal) DisconnectPortal(Portal->OldOtherPortal, IsXR);
-    DisconnectPortal(Portal, IsXR);
+    if (Portal->OldOtherPortalInEditor) UnlinkPortalReferences(Portal->OldOtherPortalInEditor, IsXR);
+    UnlinkPortalReferences(Portal, IsXR);
 
     return true;
 }

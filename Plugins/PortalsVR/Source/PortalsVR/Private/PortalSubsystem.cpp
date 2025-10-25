@@ -10,8 +10,6 @@
 #include <PortalFunctions.h>
 
 
-
-
 void UPortalSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
     if(GEngine && GEngine->XRSystem && GEngine->XRSystem->GetHMDDevice()->IsHMDConnected()) 

@@ -39,7 +39,7 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DLeft->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DLeft->HideComponent(PortalMesh);
         SceneCaptureComponent2DLeft->HideComponent(PortalHollowCubeMesh);
-
+        SceneCaptureComponent2DLeft->SetFlags(RF_Transactional);
 
         SceneCaptureComponent2DRight = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Scene Capture 2D Right"));
         SceneCaptureComponent2DRight->SetupAttachment(RootComponent);
@@ -48,21 +48,22 @@ APortalVR::APortalVR()
         SceneCaptureComponent2DRight->SetTickGroup(TG_PostPhysics);
         SceneCaptureComponent2DRight->HideComponent(PortalMesh);
         SceneCaptureComponent2DRight->HideComponent(PortalHollowCubeMesh);
-
+        SceneCaptureComponent2DRight->SetFlags(RF_Transactional);
     }
 
     //Render Target
     {
-        PortalRenderTargetLeft = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Left"));
+        FString LeftRTName = FString::Printf(TEXT("%s_PortalRenderTargetLeft"), *GetName());
+        PortalRenderTargetLeft = CreateDefaultSubobject<UTextureRenderTarget2D>(*LeftRTName);
         PortalRenderTargetLeft->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
         PortalRenderTargetLeft->InitAutoFormat(1024, 1024);
-        PortalRenderTargetLeft->UpdateResourceImmediate(true);
+        PortalRenderTargetLeft->UpdateResourceImmediate(true);        
 
-        PortalRenderTargetRight = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("Portal render target Right"));
+        LeftRTName = FString::Printf(TEXT("%s_PortalRenderTargetRight"), *GetName());
+        PortalRenderTargetRight = CreateDefaultSubobject<UTextureRenderTarget2D>(*LeftRTName);
         PortalRenderTargetRight->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // 8-bit per channel
         PortalRenderTargetRight->InitAutoFormat(1024, 1024);
         PortalRenderTargetRight->UpdateResourceImmediate(true);
-
     }
 
     //BoxTrigger
@@ -114,6 +115,9 @@ void APortalVR::BeginPlay()
 
     GetWorld()->GetSubsystem<UPortalSubsystem>()->ActivePortals.Add(this);
     count = 0;   
+
+    //if (OtherPortal)PortalTools::ConnectPortalPair(this, OtherPortal, true);
+    //else PortalTools::DisconnectPortalPair(this, true);
 }
 
 
@@ -124,6 +128,8 @@ void APortalVR::Tick(float DeltaTime)
 
     leftImageRendered = false;
     rightImageRendered = false;
+
+    //DrawDebugLine( GetWorld(),this->GetActorLocation(), OtherPortal->GetActorLocation(), FColor::Blue, true, 0.1f, 0, 5.f);
 
     if (count == 5)
     {
@@ -205,27 +211,11 @@ void APortalVR::Tick(float DeltaTime)
 #endif
 }
 
-void APortalVR::OnXRLateUpdate()
-{
-
-}
-
-void APortalVR::ConnectToPortal(APortalVR* otherPortal)
-{
-    OtherPortal = otherPortal;
-    otherPortal->SceneCaptureComponent2DLeft->TextureTarget = PortalRenderTargetLeft;
-    otherPortal->SceneCaptureComponent2DRight->TextureTarget = PortalRenderTargetRight;
-
-    //OtherPortal->SceneCaptureComponent2DLeft->HiddenActors.Add(this);
-    //OtherPortal->SceneCaptureComponent2DRight->HiddenActors.Add(this);
-
-}
-
 void APortalVR::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);    
 
-    if(OtherPortal != OldOtherPortal) PortalTools::ConnectPortalPair(this, OtherPortal, true);
+    if(OtherPortal != OldOtherPortalInEditor) PortalTools::ConnectPortalPair(this, OtherPortal, true);
 }
 
 void APortalVR::OnPortalOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)

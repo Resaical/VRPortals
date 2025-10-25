@@ -24,6 +24,10 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+	};
 protected:
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -31,10 +35,6 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
-	void OnXRLateUpdate();	
-
-	void ConnectToPortal(APortalVR* otherPortal);
 
 	//Teleport
 	UFUNCTION()
@@ -68,9 +68,11 @@ public:
 	FName RenderTargetParameterNameRight = TEXT("RenderTargetPortalRight");
 
 	// Linking objects
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly)
 	APortalVR* OtherPortal = nullptr;
-	APortalVR* OldOtherPortal = nullptr;
+
+	UPROPERTY()
+	APortalVR* OldOtherPortalInEditor = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USceneCaptureComponent2D* SceneCaptureComponent2DLeft;
